@@ -194,7 +194,19 @@ function withGlobal(_global) {
         return mirrorDateProperties(ClockDate, NativeDate);
     }
 
+    function throwIfExceededLoopLimit(clock) {
+        if (clock.throwOnNextScheduledTimer) {
+            clock.reset();
+
+            throw new Error(
+                "After running " + clock.loopLimit +
+                " timers, a new one was scheduled. Aborting, assuming an infinite loop!"
+            );
+        }
+    }
+
     function enqueueJob(clock, job) {
+        throwIfExceededLoopLimit(clock);
         // enqueues a microtick-deferred task - ecma262/#sec-enqueuejob
         if (!clock.jobs) {
             clock.jobs = [];
@@ -211,13 +223,16 @@ function withGlobal(_global) {
             var job = clock.jobs[i];
             job.func.apply(null, job.args);
             if (clock.loopLimit && i > clock.loopLimit) {
-                throw new Error("Aborting after running " + clock.loopLimit + " timers, assuming an infinite loop!");
+                clock.throwOnNextScheduledTimer = true;
+                return;
             }
         }
         clock.jobs = [];
     }
 
     function addTimer(clock, timer) {
+        throwIfExceededLoopLimit(clock);
+
         if (timer.func === undefined) {
             throw new Error("Callback must be provided to timer calls");
         }
@@ -542,7 +557,8 @@ function withGlobal(_global) {
             now: start,
             timeouts: {},
             Date: createDate(),
-            loopLimit: loopLimit
+            loopLimit: loopLimit,
+            throwOnNextScheduledTimer: false
         };
 
         clock.Date.clock = clock;
@@ -794,7 +810,7 @@ function withGlobal(_global) {
                 clock.next();
             }
 
-            throw new Error("Aborting after running " + clock.loopLimit + " timers, assuming an infinite loop!");
+            clock.throwOnNextScheduledTimer = true;
         };
 
         clock.runToFrame = function runToFrame() {
@@ -816,6 +832,7 @@ function withGlobal(_global) {
             clock.timers = {};
             clock.jobs = [];
             clock.now = start;
+            clock.throwOnNextScheduledTimer = false;
         };
 
         clock.setSystemTime = function setSystemTime(systemTime) {
