@@ -1,4 +1,15 @@
 
+15.4.0 / 2026-05-05
+==================
+
+  * fix: stop `nextAsync` `advanceUntilModeChanges ` from leaking past uninstall (#571)
+  * ci: add types job to workflow (#573)
+  * upgrade most packages (#572)
+  * feat: add support for `Temporal` API (#569)
+  * Fix no-DOM Performance type (#570)
+  * chore(deps): bump basic-ftp from 5.2.1 to 5.2.2 (#563)
+  * chore(deps-dev): bump fast-xml-parser from 5.5.7 to 5.7.1 (#568)
+
 15.3.2 / 2026-04-11
 ==================
 This actually changes some typings, so worth pushing
