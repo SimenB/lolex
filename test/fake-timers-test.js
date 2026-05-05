@@ -1,5 +1,7 @@
 "use strict";
 
+/* global Temporal */
+
 const {
     addTimerReturnsObject,
     assert,
@@ -11,6 +13,7 @@ const {
     NOOP,
     performanceMarkPresent,
     performanceNowPresent,
+    temporalPresent,
     promisePresent,
     queueMicrotaskPresent,
     refute,
@@ -6596,6 +6599,320 @@ describe("missing timers", function () {
         it("runAll works before timer state is initialized", function () {
             refute.exception(() => {
                 this.clock.runAll();
+            });
+        });
+    });
+
+    describe("Temporal (without Temporal in the global)", function () {
+        it("throws when toFake includes Temporal and it is absent", function () {
+            const FT = FakeTimers.withGlobal({ Date: globalThis.Date });
+            assert.exception(
+                () => FT.install({ toFake: ["Temporal"] }),
+                /non-existent timers/,
+            );
+        });
+
+        it("silently skips Temporal when ignoreMissingTimers is set", function () {
+            const FT = FakeTimers.withGlobal({ Date: globalThis.Date });
+            const clock = FT.install({
+                toFake: ["Temporal"],
+                ignoreMissingTimers: true,
+            });
+            assert.isUndefined(clock.Temporal);
+            clock.uninstall();
+        });
+    });
+
+    describe("Temporal.Now", function () {
+        before(function () {
+            if (!temporalPresent) {
+                this.skip();
+            }
+        });
+
+        describe("with createClock", function () {
+            it("instant() reflects clock.now", function () {
+                const clock = FakeTimers.createClock(
+                    new Date("2025-01-01T00:00:00Z"),
+                );
+                assert.equals(
+                    clock.Temporal.Now.instant().epochMilliseconds,
+                    new Date("2025-01-01T00:00:00Z").getTime(),
+                );
+            });
+
+            it("instant() advances with clock.tick", function () {
+                const clock = FakeTimers.createClock(
+                    new Date("2025-01-01T00:00:00Z"),
+                );
+                clock.tick(1000);
+                assert.equals(
+                    clock.Temporal.Now.instant().epochMilliseconds,
+                    new Date("2025-01-01T00:00:01Z").getTime(),
+                );
+            });
+
+            it("plainDateTimeISO() reflects setSystemTime", function () {
+                const clock = FakeTimers.createClock(
+                    new Date("2025-06-15T12:00:00Z"),
+                );
+                clock.setSystemTime(new Date("2030-03-20T08:30:00Z"));
+                const pdt = clock.Temporal.Now.plainDateTimeISO("UTC");
+                assert.equals(pdt.year, 2030);
+                assert.equals(pdt.month, 3);
+                assert.equals(pdt.day, 20);
+                assert.equals(pdt.hour, 8);
+                assert.equals(pdt.minute, 30);
+            });
+
+            it("Temporal constructors still work after createClock", function () {
+                const clock = FakeTimers.createClock(0);
+                const pd = new clock.Temporal.PlainDate(2025, 1, 1);
+                assert.equals(pd.year, 2025);
+            });
+
+            it("createClock accepts a Temporal.Instant as start", function () {
+                const instant = Temporal.Now.instant();
+                const clock = FakeTimers.createClock(instant);
+                assert.equals(clock.now, instant.epochMilliseconds);
+            });
+
+            it("setSystemTime accepts a Temporal.Instant", function () {
+                const clock = FakeTimers.createClock(0);
+                const instant = Temporal.Instant.fromEpochMilliseconds(
+                    new Date("2030-06-01T00:00:00Z").getTime(),
+                );
+                clock.setSystemTime(instant);
+                assert.equals(
+                    clock.Temporal.Now.instant().epochMilliseconds,
+                    instant.epochMilliseconds,
+                );
+            });
+
+            it("setSystemTime accepts a Temporal.ZonedDateTime", function () {
+                const clock = FakeTimers.createClock(0);
+                const zdt = Temporal.Now.zonedDateTimeISO("UTC");
+                clock.setSystemTime(zdt);
+                assert.equals(
+                    clock.Temporal.Now.instant().epochMilliseconds,
+                    zdt.epochMilliseconds,
+                );
+            });
+
+            it("setSystemTime accepts a Temporal.Instant even when Temporal is not faked", function () {
+                // getEpoch handles epochMilliseconds independently of toFake
+                const clock = FakeTimers.install({
+                    now: 0,
+                    toFake: ["Date"],
+                });
+                try {
+                    const instant = Temporal.Instant.fromEpochMilliseconds(
+                        new Date("2030-01-01T00:00:00Z").getTime(),
+                    );
+                    clock.setSystemTime(instant);
+                    assert.equals(
+                        clock.now,
+                        new Date("2030-01-01T00:00:00Z").getTime(),
+                    );
+                } finally {
+                    clock.uninstall();
+                }
+            });
+
+            it("install accepts a Temporal.Instant as now", function () {
+                const instant = Temporal.Instant.fromEpochMilliseconds(
+                    new Date("2025-07-04T12:00:00Z").getTime(),
+                );
+                const clock = FakeTimers.install({
+                    now: instant,
+                    toFake: ["Temporal"],
+                });
+                try {
+                    assert.equals(
+                        Temporal.Now.instant().epochMilliseconds,
+                        instant.epochMilliseconds,
+                    );
+                } finally {
+                    clock.uninstall();
+                }
+            });
+
+            it("timeZoneId() returns a string", function () {
+                const clock = FakeTimers.createClock(0);
+                assert.equals(typeof clock.Temporal.Now.timeZoneId(), "string");
+            });
+
+            it("plainTimeISO() reflects the faked clock", function () {
+                const clock = FakeTimers.createClock(
+                    new Date("2025-01-01T14:30:45Z"),
+                );
+                const pt = clock.Temporal.Now.plainTimeISO("UTC");
+                assert.equals(pt.hour, 14);
+                assert.equals(pt.minute, 30);
+                assert.equals(pt.second, 45);
+            });
+        });
+
+        describe("with install/uninstall", function () {
+            it("replaces global Temporal.Now", function () {
+                const clock = FakeTimers.install({
+                    now: new Date("2025-01-01T00:00:00Z"),
+                    toFake: ["Temporal"],
+                });
+                try {
+                    assert.equals(
+                        Temporal.Now.instant().epochMilliseconds,
+                        new Date("2025-01-01T00:00:00Z").getTime(),
+                    );
+                } finally {
+                    clock.uninstall();
+                }
+            });
+
+            it("restores original Temporal.Now after uninstall", function () {
+                const originalNow = Temporal.Now;
+                const clock = FakeTimers.install({
+                    now: new Date("2025-01-01T00:00:00Z"),
+                    toFake: ["Temporal"],
+                });
+                clock.uninstall();
+                assert.same(Temporal.Now, originalNow);
+            });
+
+            it("advances global Temporal.Now.instant with clock.tick", function () {
+                const start = new Date("2025-01-01T00:00:00Z");
+                const clock = FakeTimers.install({
+                    now: start,
+                    toFake: ["Temporal"],
+                });
+                try {
+                    clock.tick(5000);
+                    assert.equals(
+                        Temporal.Now.instant().epochMilliseconds,
+                        start.getTime() + 5000,
+                    );
+                } finally {
+                    clock.uninstall();
+                }
+            });
+
+            it("leaves Temporal.Now real when in toNotFake", function () {
+                const realInstant = Temporal.Now.instant();
+                const clock = FakeTimers.install({
+                    now: new Date("2000-01-01T00:00:00Z"),
+                    toNotFake: ["Temporal"],
+                });
+                try {
+                    assert.isTrue(
+                        Temporal.Now.instant().epochMilliseconds >=
+                            realInstant.epochMilliseconds,
+                    );
+                } finally {
+                    clock.uninstall();
+                }
+            });
+
+            it("Temporal constructors still work after install", function () {
+                const clock = FakeTimers.install({
+                    now: new Date("2025-01-01T00:00:00Z"),
+                    toFake: ["Temporal"],
+                });
+                try {
+                    const pd = new Temporal.PlainDate(2025, 6, 15);
+                    assert.equals(pd.year, 2025);
+                    assert.equals(pd.month, 6);
+                    assert.equals(pd.day, 15);
+                } finally {
+                    clock.uninstall();
+                }
+            });
+        });
+
+        describe("tick/jump with Temporal.Duration", function () {
+            it("clock.tick accepts a Temporal.Duration", function () {
+                const clock = FakeTimers.createClock(
+                    new Date("2025-01-01T00:00:00Z"),
+                );
+                clock.tick(new Temporal.Duration(0, 0, 0, 0, 1, 30)); // 1h30m
+                assert.equals(
+                    clock.Temporal.Now.instant().epochMilliseconds,
+                    new Date("2025-01-01T01:30:00Z").getTime(),
+                );
+            });
+
+            it("clock.tick accepts a Temporal.Duration with seconds and ms", function () {
+                const clock = FakeTimers.createClock(
+                    new Date("2025-01-01T00:00:00Z"),
+                );
+                clock.tick(new Temporal.Duration(0, 0, 0, 0, 0, 0, 5, 500)); // 5.5s
+                assert.equals(
+                    clock.Temporal.Now.instant().epochMilliseconds,
+                    new Date("2025-01-01T00:00:05.500Z").getTime(),
+                );
+            });
+
+            it("clock.jump accepts a Temporal.Duration", function () {
+                const clock = FakeTimers.createClock(
+                    new Date("2025-01-01T00:00:00Z"),
+                );
+                clock.jump(new Temporal.Duration(0, 0, 0, 1)); // 1 day
+                assert.equals(
+                    clock.Temporal.Now.instant().epochMilliseconds,
+                    new Date("2025-01-02T00:00:00Z").getTime(),
+                );
+            });
+
+            it("clock.tick resolves calendar units (months) using relativeTo", function () {
+                // February has 28 days in 2025; a 1-month duration from 2025-01-31
+                // should land on 2025-02-28, not 2025-03-03
+                const clock = FakeTimers.createClock(
+                    new Date("2025-01-31T00:00:00Z"),
+                );
+                clock.tick(new Temporal.Duration(0, 1)); // 1 month
+                const pdt = clock.Temporal.Now.plainDateISO("UTC");
+                assert.equals(pdt.year, 2025);
+                assert.equals(pdt.month, 2);
+                assert.equals(pdt.day, 28);
+            });
+
+            it("clock.tickAsync accepts a Temporal.Duration", async function () {
+                const clock = FakeTimers.install({
+                    now: new Date("2025-01-01T00:00:00Z"),
+                    toFake: ["Temporal", "setTimeout"],
+                });
+                try {
+                    await clock.tickAsync(
+                        new Temporal.Duration(0, 0, 0, 0, 0, 1), // 1 minute
+                    );
+                    assert.equals(
+                        Temporal.Now.instant().epochMilliseconds,
+                        new Date("2025-01-01T00:01:00Z").getTime(),
+                    );
+                } finally {
+                    clock.uninstall();
+                }
+            });
+        });
+
+        describe("with withGlobal", function () {
+            it("fakes Temporal.Now on a custom global", function () {
+                const customGlobal = {
+                    Temporal: globalThis.Temporal,
+                    Date: globalThis.Date,
+                };
+                const FT = FakeTimers.withGlobal(customGlobal);
+                const clock = FT.install({
+                    now: new Date("2025-01-01T00:00:00Z"),
+                    toFake: ["Temporal"],
+                });
+                try {
+                    assert.equals(
+                        customGlobal.Temporal.Now.instant().epochMilliseconds,
+                        new Date("2025-01-01T00:00:00Z").getTime(),
+                    );
+                } finally {
+                    clock.uninstall();
+                }
             });
         });
     });
