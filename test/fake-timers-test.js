@@ -6643,8 +6643,12 @@ describe("missing timers", function () {
         });
 
         it("tick() accepts a TemporalDuration-shaped object even when Temporal is absent from the global", function () {
-            const clock = FakeTimers.createClock(0);
-            // duck-typed Duration: total("millisecond") returns ms, no native Temporal required
+            // Use a custom global without Temporal so isPresent.Temporal is false,
+            // ensuring the test exercises the fix even on Node 26+ where Temporal exists.
+            const clock = FakeTimers.withGlobal({
+                Date: globalThis.Date,
+            }).createClock(0);
+            // duck-typed Duration: total({ unit: "millisecond" }) returns ms, no native Temporal required
             const duration = {
                 total: ({ unit }) => (unit === "millisecond" ? 5000 : 5),
             };
