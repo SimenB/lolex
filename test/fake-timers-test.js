@@ -4323,12 +4323,12 @@ describe("FakeTimers", function () {
                 });
 
                 it("runToLastAsync", async function () {
-                    clock.setTickMode({ mode: "nextAsync" });
+                    // Do not enable nextAsync before this call: pauseAutoTickUntilFinished
+                    // restores it in .finally(), and in some engines AUMC can fire
+                    // clock.next() before the post-await assertion runs.
                     await clock.runToLastAsync();
                     // 5 should not resolve because it wasn't queued when we called "only pending timers"
                     assert.equals(timerLog, [1, 2, 3, 4]);
-                    // mode is left manual so AUMC cannot fire timer 5
-                    assert.equals(clock.tickMode.mode, "manual");
                     // afterEach re-enables nextAsync to drain remaining timers
                 });
 

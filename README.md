@@ -352,12 +352,6 @@ sets timers that would cause `runAll` to trigger an infinite loop warning.
 The `runToLastAsync()` will also break the event loop, allowing any scheduled promise
 callbacks to execute _before_ running the timers.
 
-If the clock is in `nextAsync` mode when called, auto-ticking is paused for the
-duration and is **not** restored on completion — the clock is left in `manual` mode.
-This enforces the bounded semantic above: dynamically queued timers will not
-auto-fire as a side-effect of `runToLastAsync()` completing. Re-enable `nextAsync`
-mode explicitly if you want auto-advancement to resume after the call.
-
 ### `clock.setSystemTime([now])`
 
 This simulates a user changing the system clock while your program is running.

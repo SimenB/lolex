@@ -1915,17 +1915,13 @@ function withGlobal(_global) {
         /**
          * Temporarily pauses nextAsync auto-ticking while an async operation runs.
          * @param {Promise<unknown>} promise
-         * @param {boolean} [restoreNextAsync] whether to restore nextAsync mode when the promise settles
          * @returns {Promise<unknown>}
          */
-        function pauseAutoTickUntilFinished(promise, restoreNextAsync = true) {
+        function pauseAutoTickUntilFinished(promise) {
             if (clock.tickMode.mode !== "nextAsync") {
                 return promise;
             }
             clock.setTickMode({ mode: "manual" });
-            if (!restoreNextAsync) {
-                return promise;
-            }
             return promise.finally(() => {
                 if (!uninstalled) {
                     clock.setTickMode({ mode: "nextAsync" });
@@ -2372,11 +2368,10 @@ function withGlobal(_global) {
         };
 
         /**
-         * @param {(resolve: (value: unknown) => void, reject: (reason?: unknown) => void) => void} callback function to run inside a native macrotask (setImmediate/setTimeout)
-         * @param {boolean} [restoreNextAsync] whether to restore nextAsync mode when the promise settles
+         * @param {(resolve: (value: unknown) => void, reject: (reason?: unknown) => void) => void} callback function to run inside native setTimeout
          * @returns {Promise}
          */
-        function runAsyncWithNativeTimeout(callback, restoreNextAsync = true) {
+        function runAsyncWithNativeTimeout(callback) {
             return pauseAutoTickUntilFinished(
                 new _global.Promise(function (resolve, reject) {
                     originalSetTimeout(function () {
@@ -2387,7 +2382,6 @@ function withGlobal(_global) {
                         }
                     });
                 }),
-                restoreNextAsync,
             );
         }
 
@@ -2515,10 +2509,6 @@ function withGlobal(_global) {
             };
 
             clock.runToLastAsync = function runToLastAsync() {
-                // runToLastAsync is a bounded operation — do not restore nextAsync
-                // mode on completion. AUMC resuming afterward would fire dynamically
-                // queued timers that the documented bound says should not run.
-                // Callers re-enable nextAsync explicitly if they want auto-advancement.
                 return runAsyncWithNativeTimeout(function (resolve) {
                     const timer = lastTimer(clock);
                     if (!timer) {
@@ -2528,7 +2518,7 @@ function withGlobal(_global) {
                     }
 
                     resolve(clock.tickAsync(timer.callAt - clock.now));
-                }, /* restoreNextAsync */ false);
+                });
             };
         }
 
