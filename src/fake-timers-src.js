@@ -2372,7 +2372,7 @@ function withGlobal(_global) {
         };
 
         /**
-         * @param {(resolve: (value: unknown) => void, reject: (reason?: unknown) => void) => void} callback function to run inside native setTimeout
+         * @param {(resolve: (value: unknown) => void, reject: (reason?: unknown) => void) => void} callback function to run inside a native macrotask (setImmediate/setTimeout)
          * @param {boolean} [restoreNextAsync] whether to restore nextAsync mode when the promise settles
          * @returns {Promise}
          */

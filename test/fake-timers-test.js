@@ -4212,8 +4212,8 @@ describe("FakeTimers", function () {
 
             it("does not create an infinite loop when uninstalled while a tickAsync is in flight", function (done) {
                 // Regression test for https://github.com/sinonjs/fake-timers/issues/564.
-                // tickAsync() pauses nextAsync mode; the restore is scheduled via a
-                // native setTimeout. If uninstall() runs before that fires, the restore
+                // tickAsync() pauses nextAsync mode; the restore runs via a native
+                // macrotask (setImmediate/setTimeout). If uninstall() runs before that fires, the restore
                 // must be a no-op.
                 setTimeout(done, 100);
                 clock.tickAsync(100); // intentionally NOT awaited
@@ -4311,6 +4311,7 @@ describe("FakeTimers", function () {
                 });
 
                 afterEach(async function () {
+                    clock.setTickMode({ mode: "nextAsync" });
                     await allTimersDone;
                     assert.equals(timerLog, [1, 2, 3, 4, 5]);
                 });
@@ -4328,8 +4329,7 @@ describe("FakeTimers", function () {
                     assert.equals(timerLog, [1, 2, 3, 4]);
                     // mode is left manual so AUMC cannot fire timer 5
                     assert.equals(clock.tickMode.mode, "manual");
-                    // re-enable so afterEach can drain the remaining timers
-                    clock.setTickMode({ mode: "nextAsync" });
+                    // afterEach re-enables nextAsync to drain remaining timers
                 });
 
                 it("nextAsync", async function () {
