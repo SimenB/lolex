@@ -4326,17 +4326,9 @@ describe("FakeTimers", function () {
                     await clock.runToLastAsync();
                     // 5 should not resolve because it wasn't queued when we called "only pending timers"
                     assert.equals(timerLog, [1, 2, 3, 4]);
-                    // runToLastAsync leaves the clock in manual mode; re-enable
-                    // nextAsync so afterEach can drain the remaining timers.
-                    clock.setTickMode({ mode: "nextAsync" });
-                });
-
-                it("runToLastAsync leaves clock in manual mode", async function () {
-                    clock.setTickMode({ mode: "nextAsync" });
-                    await clock.runToLastAsync();
-                    // Mode must be manual — AUMC cannot fire timer 5.
+                    // mode is left manual so AUMC cannot fire timer 5
                     assert.equals(clock.tickMode.mode, "manual");
-                    assert.equals(timerLog, [1, 2, 3, 4]);
+                    // re-enable so afterEach can drain the remaining timers
                     clock.setTickMode({ mode: "nextAsync" });
                 });
 
