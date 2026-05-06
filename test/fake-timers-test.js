@@ -6642,8 +6642,7 @@ describe("missing timers", function () {
         });
 
         it("tick() accepts a TemporalDuration-shaped object even when Temporal is absent from the global", function () {
-            // Use a custom global without Temporal so isPresent.Temporal is false,
-            // ensuring the test exercises the fix even on Node 26+ where Temporal exists.
+            // Use a custom global without Temporal so isPresent.Temporal is false
             const clock = FakeTimers.withGlobal({
                 Date: globalThis.Date,
             }).createClock(0);
