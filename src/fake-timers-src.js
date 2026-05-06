@@ -1914,9 +1914,6 @@ function withGlobal(_global) {
 
         /**
          * Temporarily pauses nextAsync auto-ticking while an async operation runs.
-         * Restores nextAsync mode after a macrotask boundary so that assertions
-         * running synchronously after the awaited operation complete before AUMC
-         * can fire clock.next().
          * @param {Promise<unknown>} promise
          * @returns {Promise<unknown>}
          */
@@ -1927,13 +1924,7 @@ function withGlobal(_global) {
             clock.setTickMode({ mode: "manual" });
             return promise.finally(() => {
                 if (!uninstalled) {
-                    // Delay by one native macrotask so post-await assertions
-                    // execute before AUMC resumes.
-                    originalSetTimeout(() => {
-                        if (!uninstalled && clock.tickMode.mode === "manual") {
-                            clock.setTickMode({ mode: "nextAsync" });
-                        }
-                    });
+                    clock.setTickMode({ mode: "nextAsync" });
                 }
             });
         }
